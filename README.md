@@ -25,18 +25,3 @@ git config core.hooksPath .githooks
 ```
 
 `DEBUG` defaults to `False`; set `DEBUG=True` only for local development. In any deployed environment, always set `SECRET_KEY` and `ALLOWED_HOSTS`.
-
-## Releases
-
-The public final version lives on the `release` branch. Releasing never deploys anything: the running app (staging) is only updated by changes merged to `main`.
-
-| Branch | What happens |
-|---|---|
-| `main` | CI runs build and test, then deploys to **staging** |
-| `release` | CI runs build and test. No deploy |
-
-To publish a new final version, open a pull request from `main` into `release` and merge it once CI passes:
-
-```bash
-gh pr create --base release --head main --title "Release"
-```
