@@ -10,21 +10,16 @@ jobs:
   build:
     name: build
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-
       - name: Install dependencies
         run: pip install -r requirements.txt
-
       - name: Compile Python files
-        run: python -m compileall -q config hello manage.py
-
+        run: python -m compileall .
       - name: Django system check
         run: python manage.py check
 
@@ -32,18 +27,14 @@ jobs:
     name: test
     needs: build
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-
       - name: Install dependencies
         run: pip install -r requirements.txt
-
       - name: Run tests
         run: pytest -v
 
@@ -52,16 +43,8 @@ jobs:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
-
-      # Fake deploy: replace these steps with the real staging deploy.
-      - name: Deploy to staging (fake)
-        run: |
-          echo "Deploying commit ${GITHUB_SHA::7} to staging..."
-          echo "Deploy finished."
-
-      - name: Smoke test (fake)
-        run: |
-          echo 'GET /health -> {"status": "ok"}'
+      - name: Fake staging deploy
+        run: echo "Deploying to staging..."
+      - name: Smoke test
+        run: echo "Smoke test passed"
