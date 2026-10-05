@@ -1,5 +1,16 @@
 #!/bin/sh
-# Run the test suite before each commit. Skip with: git commit --no-verify
+# Run Talisman on staged changes, then the test suite, before each commit.
+# Skip with: git commit --no-verify
+
+if command -v talisman >/dev/null 2>&1; then
+  echo "pre-commit: running talisman..."
+  if ! talisman --githook pre-commit; then
+    echo "pre-commit: talisman found a problem, commit aborted."
+    exit 1
+  fi
+else
+  echo "pre-commit: talisman not installed, skipping it (brew install talisman)."
+fi
 
 if [ -x venv/bin/pytest ]; then
   PYTEST=venv/bin/pytest
