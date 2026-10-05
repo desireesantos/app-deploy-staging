@@ -14,3 +14,9 @@ python manage.py runserver              # dev: http://127.0.0.1:8000
 pytest                                  # tests
 gunicorn config.wsgi:application        # production server
 ```
+
+Enable the pre-commit hook (runs tests before each commit; once per clone):
+
+```bash
+git config core.hooksPath .githooks
+```
