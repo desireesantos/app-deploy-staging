@@ -1,0 +1,14 @@
+#!/bin/sh
+# Run the test suite before each commit. Skip with: git commit --no-verify
+
+if [ -x venv/bin/pytest ]; then
+  PYTEST=venv/bin/pytest
+else
+  PYTEST=pytest
+fi
+
+echo "pre-commit: running tests..."
+if ! "$PYTEST" -q; then
+  echo "pre-commit: tests failed, commit aborted."
+  exit 1
+fi

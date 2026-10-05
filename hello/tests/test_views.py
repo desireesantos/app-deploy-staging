@@ -10,10 +10,3 @@ def test_health_returns_ok(client):
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
-
-
-def test_intentionally_broken(client):
-    # Intentionally failing test to verify CI blocks the merge. Remove before merging.
-    response = client.get("/")
-
-    assert response.content == b"Goodbye, World!"
