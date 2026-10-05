@@ -28,18 +28,15 @@ git config core.hooksPath .githooks
 
 ## Releases
 
-Publishing a version does not deploy anything. The running app (staging) is only updated by changes merged to `main`.
+The public final version lives on the `release` branch. Releasing never deploys anything: the running app (staging) is only updated by changes merged to `main`.
 
-| Trigger | What happens |
+| Branch | What happens |
 |---|---|
-| Push / merge to `main` | CI runs build and test, then deploys to **staging** |
-| Tag `vX.Y.Z-beta.N` / `vX.Y.Z-rc.N` | Tests run and a public GitHub **pre-release** is created |
-| Tag `vX.Y.Z` | Tests run and a public GitHub **release** is created |
+| `main` | CI runs build and test, then deploys to **staging** |
+| `release` | CI runs build and test. No deploy |
 
-Tags must point to a commit already on `main`.
+To publish a new final version, open a pull request from `main` into `release` and merge it once CI passes:
 
 ```bash
-git checkout main && git pull
-git tag -a v1.0.0 -m "v1.0.0"
-git push origin v1.0.0
+gh pr create --base release --head main --title "Release"
 ```
