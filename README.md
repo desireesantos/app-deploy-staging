@@ -1,4 +1,7 @@
 # app-deploy-staging
+
+[![CI](https://github.com/desireesantos/app-deploy-staging/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/desireesantos/app-deploy-staging/actions/workflows/ci.yml)
+
 Repositório para testes e validação da automação de deploy do aplicativo em ambiente stagging(teste)
 
 ## Hello World (Django)
