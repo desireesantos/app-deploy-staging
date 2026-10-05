@@ -19,10 +19,13 @@ ruff check . && ruff format --check .  # lint
 gunicorn config.wsgi:application        # production server
 ```
 
-Enable the pre-commit hook (runs tests before each commit; once per clone):
+Enable the pre-commit hook (scans for secrets and runs tests before each commit; once per clone):
 
 ```bash
+brew install talisman                   # secret scanner used by the hook
 git config core.hooksPath .githooks
 ```
+
+If Talisman flags a false positive, it prints the `.talismanrc` entry to add. CI also scans every push and pull request with [Gitleaks](https://github.com/gitleaks/gitleaks), and a finding blocks the tests and the deploy.
 
 `DEBUG` defaults to `False`; set `DEBUG=True` only for local development. In any deployed environment, always set `SECRET_KEY` and `ALLOWED_HOSTS`.
