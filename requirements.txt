@@ -3,5 +3,8 @@ django>=5.0,<5.3
 # Testing
 pytest-django
 
+# Linting (pinned so new rules don't break CI unexpectedly)
+ruff==0.16.10
+
 # Production server (WSGI)
 gunicorn
