@@ -15,6 +15,7 @@ pip install -r requirements.txt
 
 DEBUG=True python manage.py runserver   # dev: http://127.0.0.1:8000
 pytest                                  # tests
+ruff check . && ruff format --check .  # lint
 gunicorn config.wsgi:application        # production server
 ```
 
