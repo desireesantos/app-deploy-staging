@@ -1,0 +1,12 @@
+fileignoreconfig:
+- filename: docs/superpowers/specs/2026-10-07-deploy-staging-design.md
+  checksum: a74630b110d846b5d34e673481a6d6976941383d530b64e1ec71a751bb5334b0
+- filename: docs/superpowers/plans/2026-10-07-deploy-staging.md
+  checksum: 19b766aaa98a2337ecfdd5b17c9979605260b0bd1bb70478919a094ca890f382
+- filename: .github/workflows/ci.yml
+  checksum: e4843c0535a991909b79414ae2d346289b5b5414ec80521f63c71b93992dd2b7
+- filename: README.md
+  checksum: 425fa8678d206e6c8736c1eeae81dfc16e41ad7ce287f089fd48ba515a67dfef
+- filename: scripts/deploy_staging.sh
+  checksum: f64e150421da0a9381c07fbe0831d28aa1a425b34224b2a812c517663a2d0e7d
+version: "1.0"
