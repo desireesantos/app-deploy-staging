@@ -76,19 +76,19 @@ The `staging` GitHub environment holds the secrets. A manual-approval rule can b
 2. `git pull --ff-only`
 3. `./venv/bin/pip install -r requirements.txt`
 4. `./venv/bin/python manage.py migrate --noinput`
-5. Restart the Celery worker:
-   - `byobu kill-session -t celery 2>/dev/null || true`
-   - `byobu new-session -d -s celery "./venv/bin/celery -A config worker -l info"`
-6. Restart the web server:
-   - `byobu kill-session -t web 2>/dev/null || true`
-   - `byobu new-session -d -s web "./venv/bin/python manage.py runserver 0.0.0.0:9100"`
-7. Health check: poll `curl -fsS http://localhost:9100/health` every 2 seconds for up to 30 seconds. Exit 0 on the first success. Otherwise, exit non-zero.
+5. Restart the Celery worker, then 6. the web server. For each byobu session (`celery`, `web`):
+   - If the session exists, send `TERM` to its process and wait up to 30 seconds for it to exit. Closing a session alone sends `HUP`, which Celery treats as "restart" and which would leave an orphaned worker.
+   - `byobu kill-session -t <name> 2>/dev/null || true`
+   - `byobu new-session -d -s <name> -c "$PWD" bash -lc "exec <command>"`, then `byobu set-option -t <name> remain-on-exit on`, so a crashed process leaves its pane open to inspect.
+   - Commands: `./venv/bin/celery -A config worker -l info` and `./venv/bin/python manage.py runserver --noreload 0.0.0.0:9100`. `--noreload` stops `git pull` from restarting the running server on new code before migrations run.
+7. Health check: poll `curl -fsS --max-time 5 http://localhost:9100/health` every 2 seconds for up to 30 seconds. Exit non-zero if it never passes.
+8. Check that the `celery` pane is still alive. Exit non-zero if it isn't.
 
 **Why this order differs from the request:** the request starts Celery before `git pull`, which would leave the worker running the old code. The order here pulls, installs, migrates, then restarts both processes, so both run the new code.
 
 **Why detached byobu sessions:** `runserver` and the Celery worker never exit. Detached sessions (`-d`) let the SSH command return so the CI job can finish, while the processes keep running after CI disconnects. You can still attach to them on the server with `byobu attach -t web` or `byobu attach -t celery`.
 
-**Why kill before starting:** without it, a second deploy would leave the old worker running and would fail to bind port 9100.
+**Why stop before starting:** without it, a second deploy would leave the old worker running and would fail to bind port 9100.
 
 ### Error handling
 

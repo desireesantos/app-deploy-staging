@@ -12,19 +12,42 @@ set -euo pipefail
 HEALTH_URL="http://localhost:9100/health"
 HEALTH_ATTEMPTS=15
 HEALTH_INTERVAL=2
+STOP_TIMEOUT=30
 
 # Replaces a detached byobu session so the process outlives the SSH session.
-# On a first deploy the session doesn't exist yet, so kill-session may fail.
+# The old process gets TERM (a Celery warm shutdown) and up to STOP_TIMEOUT
+# seconds to exit first: closing the session alone sends HUP, which Celery
+# treats as "restart", leaving an orphaned worker. On a first deploy the
+# session doesn't exist yet, so there is nothing to stop.
+# The command is passed as separate arguments and exec'd, so the pane's
+# process is the app itself, and the pane stays open if it exits, so
+# `byobu attach -t <name>` shows why.
 restart_session() {
-  local name="$1" command="$2"
+  local name="$1" command="$2" pid _
+  if pid=$(byobu list-panes -t "$name" -F '#{pane_pid}' 2>/dev/null); then
+    kill -TERM "$pid" 2>/dev/null || true
+    for _ in $(seq 1 "$STOP_TIMEOUT"); do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 1
+    done
+  fi
   byobu kill-session -t "$name" 2>/dev/null || true
-  byobu new-session -d -s "$name" -c "$PWD" "bash -lc '$command'"
+  byobu new-session -d -s "$name" -c "$PWD" bash -lc "exec $command"
+  byobu set-option -t "$name" remain-on-exit on
+}
+
+check_session_alive() {
+  local name="$1"
+  if [ "$(byobu list-panes -t "$name" -F '#{pane_dead}' 2>/dev/null)" != "0" ]; then
+    echo "$name is not running. Inspect it with: byobu attach -t $name" >&2
+    return 1
+  fi
 }
 
 wait_for_health() {
   local attempt
   for attempt in $(seq 1 "$HEALTH_ATTEMPTS"); do
-    if curl -fsS -o /dev/null "$HEALTH_URL"; then
+    if curl -fsS --max-time 5 -o /dev/null "$HEALTH_URL"; then
       echo "Health check passed on attempt $attempt."
       return 0
     fi
@@ -55,10 +78,15 @@ main() {
   restart_session celery "./venv/bin/celery -A config worker -l info"
 
   echo "==> Restarting web server on port 9100 (byobu session: web)"
-  restart_session web "./venv/bin/python manage.py runserver 0.0.0.0:9100"
+  # --noreload: otherwise git pull restarts the running server on new code
+  # before migrations have run.
+  restart_session web "./venv/bin/python manage.py runserver --noreload 0.0.0.0:9100"
 
   echo "==> Waiting for $HEALTH_URL"
   wait_for_health
+
+  echo "==> Checking the Celery worker"
+  check_session_alive celery
 }
 
 main "$@"

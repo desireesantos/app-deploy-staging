@@ -18,7 +18,7 @@
 - Secrets: `STAGING_HOST`, `STAGING_PORT`, `STAGING_USER`, `STAGING_PASSWORD`, `STAGING_APP_DIR`, `STAGING_HOST_KEY`.
 - The password reaches ssh only through the `SSHPASS` environment variable (`sshpass -e`), never on a command line.
 - Host key checking stays on: `STAGING_HOST_KEY` is written to `~/.ssh/known_hosts`.
-- Server order: `git pull --ff-only` → `./venv/bin/pip install -r requirements.txt` → `./venv/bin/python manage.py migrate --noinput` → restart byobu session `celery` running `./venv/bin/celery -A config worker -l info` → restart byobu session `web` running `./venv/bin/python manage.py runserver 0.0.0.0:9100` → health check.
+- Server order: `git pull --ff-only` → `./venv/bin/pip install -r requirements.txt` → `./venv/bin/python manage.py migrate --noinput` → restart byobu session `celery` running `./venv/bin/celery -A config worker -l info` → restart byobu session `web` running `./venv/bin/python manage.py runserver --noreload 0.0.0.0:9100` → health check → Celery pane alive. (Review fixes; see the spec's server script section.)
 - Health check: `http://localhost:9100/health`, every 2 seconds, up to 30 seconds (15 attempts).
 - The app code (`config/`, `hello/`) is **not** changed. Celery and SQLite are assumed to work on the server after `git pull`.
 
@@ -470,19 +470,20 @@ If Talisman flags the README (it reacts to words like `PASSWORD`), add the `file
 
 This task needs credentials and access to the staging server, so the repo owner does it, not an agent. Do Steps 1–3 **before merging** the PR. Otherwise the first push to `main` runs the job with no secrets and fails.
 
-- [ ] **Step 1: Dry-run the script on the server by hand**
+- [ ] **Step 1: Dry-run the script exactly as CI runs it**
 
-SSH to the server as the deploy user, then:
+First check the byobu backend on the server: `ssh <user>@<host> 'cat ~/.byobu/backend 2>/dev/null'`. Expect `BYOBU_BACKEND=tmux`, or no file (tmux is the default). If it says `screen`, run `byobu-select-backend tmux` on the server; the script uses tmux flags.
+
+Then, from your laptop, on the branch with Task 1, run the same command as the CI job. There's no tty, the script arrives on stdin, and bash runs as a login shell. That flushes out profile side effects (such as a `byobu-launch` line in `~/.profile`) and git credential prompts before the first real deploy:
 
 ```bash
-cd <app dir>
-cat ~/.byobu/backend 2>/dev/null   # expect BYOBU_BACKEND=tmux, or no file (tmux is the default)
-git fetch origin docs/deploy-staging-spec   # or whichever branch holds Task 1
-git show FETCH_HEAD:scripts/deploy_staging.sh > /tmp/deploy_staging.sh
-bash /tmp/deploy_staging.sh "$PWD"
+read -rs SSHPASS && export SSHPASS     # type the deploy password; it isn't echoed
+sshpass -e ssh -p <port> -o PreferredAuthentications=password,keyboard-interactive \
+  <user>@<host> "bash -ls -- '<absolute app dir>'" < scripts/deploy_staging.sh
+unset SSHPASS
 ```
 
-Expected: the steps print in order, ending with `Health check passed on attempt N.`, and `byobu ls` shows sessions `celery` and `web`. If the backend is `screen`, switch with `byobu-select-backend tmux`; the script's `-c` and `kill-session` flags are tmux flags.
+Expected: the steps print in order, ending with `Health check passed on attempt N.` and exit 0. On the server, `byobu ls` shows sessions `celery` and `web`. Run it a second time, then check `pgrep -af 'celery -A config worker'` on the server: there should be exactly one worker (no orphans from the first run).
 
 - [ ] **Step 2: Capture the host key from a trusted network**
 

@@ -6,6 +6,7 @@ celery) log each call, so we can check what runs and in what order without
 a server. The script is fed on stdin, exactly as CI pipes it over SSH.
 """
 
+import signal
 import subprocess
 from pathlib import Path
 
@@ -29,10 +30,19 @@ echo "$name $*" >> "$CALL_LOG"
 case " $FAIL_COMMANDS " in *" $name "*) exit 1 ;; esac
 """
 
-# kill-session always fails, as on a first deploy with no sessions yet.
+# With $RUNNING_PID unset, behaves as on a first deploy: no sessions exist,
+# so list-panes and kill-session fail. With it set, every session's pane runs
+# that pid. The pane_dead query answers $PANE_DEAD (default 0, alive).
 BYOBU_STUB = """#!/bin/sh
 echo "byobu $*" >> "$CALL_LOG"
-[ "$1" = "kill-session" ] && exit 1
+case "$1" in
+  kill-session) exit 1 ;;
+  list-panes)
+    case "$*" in
+      *pane_dead*) echo "${PANE_DEAD:-0}" ;;
+      *) [ -n "$RUNNING_PID" ] || exit 1; echo "$RUNNING_PID" ;;
+    esac ;;
+esac
 exit 0
 """
 
@@ -107,17 +117,22 @@ def test_deploys_in_order(server):
         "git pull --ff-only",
         "pip install -r requirements.txt",
         "python manage.py migrate --noinput",
+        "byobu list-panes -t celery -F #{pane_pid}",
         "byobu kill-session -t celery",
         (
             f"byobu new-session -d -s celery -c {app_dir} "
-            "bash -lc './venv/bin/celery -A config worker -l info'"
+            "bash -lc exec ./venv/bin/celery -A config worker -l info"
         ),
+        "byobu set-option -t celery remain-on-exit on",
+        "byobu list-panes -t web -F #{pane_pid}",
         "byobu kill-session -t web",
         (
             f"byobu new-session -d -s web -c {app_dir} "
-            "bash -lc './venv/bin/python manage.py runserver 0.0.0.0:9100'"
+            "bash -lc exec ./venv/bin/python manage.py runserver --noreload 0.0.0.0:9100"
         ),
-        "curl -fsS -o /dev/null http://localhost:9100/health",
+        "byobu set-option -t web remain-on-exit on",
+        "curl -fsS --max-time 5 -o /dev/null http://localhost:9100/health",
+        "byobu list-panes -t celery -F #{pane_dead}",
     ]
 
 
@@ -159,3 +174,24 @@ def test_requires_app_dir_argument(server):
     assert result.returncode == 2
     assert "usage: deploy_staging.sh <app-dir>" in result.stderr
     assert calls(server) == []
+
+
+def test_stops_running_processes_with_term_before_restart(server):
+    # Closing a session alone sends HUP, which Celery treats as "restart",
+    # leaving an orphaned worker. The script must TERM the pane's process.
+    running = subprocess.Popen(["/bin/sleep", "30"])
+    try:
+        result = run_deploy(server, RUNNING_PID=str(running.pid))
+
+        assert result.returncode == 0, result.stderr
+        assert running.wait(timeout=5) == -signal.SIGTERM
+    finally:
+        running.kill()
+
+
+def test_fails_when_celery_worker_died(server):
+    result = run_deploy(server, PANE_DEAD="1")
+
+    assert result.returncode != 0
+    assert "celery is not running" in result.stderr
+    assert "byobu attach -t celery" in result.stderr
