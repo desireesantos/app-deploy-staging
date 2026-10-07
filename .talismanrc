@@ -3,4 +3,6 @@ fileignoreconfig:
   checksum: b0019f2e17755c6d2260801c9b2a0c6d2d50bb18b152f5ed08565908ae7eb110
 - filename: docs/superpowers/plans/2026-10-07-deploy-staging.md
   checksum: f03afc9789dbc09c5c4c9110f2b956f39b1a94f7f798a8d4dfbe36842c2031cf
+- filename: .github/workflows/ci.yml
+  checksum: bc69c4be6d26e6d218aab1c931d135aba8d44b56a12e3e1fd65aa31996d29725
 version: "1.0"
